@@ -22,8 +22,8 @@ function test_simple()
       '}'
 
    -- Input to deflate is same as output to inflate:
-   local got = yajl.to_string(yajl.to_lua(expect))
-   ok(expect == got, expect .. " == " .. got)
+   local got = yajl.to_string(yajl.to_value(expect))
+   ok(expect == got, expect .. " == " .. tostring(got))
 end
 
 main()
