@@ -2,6 +2,7 @@
 #include <yajl/yajl_gen.h>
 #include <lua.h>
 #include <lauxlib.h>
+#include <math.h>
 
 //////////////////////////////////////////////////////////////////////
 static int js_to_string(lua_State *L) {
@@ -357,12 +358,6 @@ static int js_generator_delete(lua_State *L) {
 }
 
 //////////////////////////////////////////////////////////////////////
-static int js_generator_value(lua_State *L) {
-    // TODO: Automatically determine the value.
-    return 0;
-}
-
-//////////////////////////////////////////////////////////////////////
 static void js_generator_assert(lua_State *L,
                                 yajl_gen_status status,
                                 const char* file,
@@ -387,6 +382,7 @@ static void js_generator_assert(lua_State *L,
     }
     lua_error(L);
 }
+
 //////////////////////////////////////////////////////////////////////
 static int js_generator_integer(lua_State *L) {
     js_generator_assert(L,
@@ -505,6 +501,109 @@ static int js_generator_close(lua_State *L) {
     lua_pushnil(L);
     lua_rawseti(L, -2, lua_objlen(L, -2));
 
+    return 0;
+}
+
+//////////////////////////////////////////////////////////////////////
+static int js_generator_value(lua_State *L) {
+    int type = lua_type(L, 2);
+
+    switch ( type ) {
+    case LUA_TNIL:
+        return js_generator_null(L);
+    case LUA_TNUMBER:
+        return js_generator_null(L);
+    case LUA_TBOOLEAN:
+        return js_generator_number(L);
+    case LUA_TSTRING:
+        return js_generator_string(L);
+    case LUA_TTABLE:
+    case LUA_TFUNCTION:
+    case LUA_TUSERDATA:
+    case LUA_TTHREAD:
+    case LUA_TLIGHTUSERDATA:
+        if ( luaL_getmetafield(L, 2, "__gen_json") ) {
+            if  ( lua_isfunction(L, -1) ) {
+                lua_settop(L, 3); // gen, obj, func
+                lua_insert(L, 1); // func, gen, obj
+                lua_insert(L, 2); // func, obj, gen
+                lua_call(L, 2, 0);
+                return 0;
+            }
+            lua_pop(L, 1);
+        }
+        // Simply ignore it, perhaps we should warn?
+        if ( type != LUA_TTABLE ) return 0;
+
+        int max      = 0;
+        int is_array = 1;
+
+        // First iterate over the table to see if it is an array:
+        lua_pushnil(L);
+        while ( lua_next(L, 2) != 0 ) {
+            if ( lua_isnumber(L, -2) ) {
+                double num = lua_tonumber(L, -2);
+                if ( num == floor(num) ) {
+                    if ( num > max ) max = num;
+                } else {
+                    lua_pop(L, 2);
+                    is_array = 0;
+                    break;
+                }
+            } else {
+                lua_pop(L, 2);
+                is_array = 0;
+                break;
+            }
+            lua_pop(L, 1);
+        }
+
+        if ( is_array ) {
+            js_generator_open_array(L);
+            for ( int i=1; i <= max; i++ ) {
+                lua_pushinteger(L, i);
+                lua_gettable(L, 2);
+
+                // RECURSIVE CALL:
+                // gen, obj, ?, val, func, gen, val
+                lua_pushcfunction(L, js_generator_value);
+                lua_pushvalue(L, 1);
+                lua_pushvalue(L, -3);
+                lua_call(L, 2, 0);
+
+                lua_pop(L, 1);
+            }
+        } else {
+            js_generator_open_object(L);
+
+            lua_pushnil(L);
+            while ( lua_next(L, 2) != 0 ) {
+                // gen, obj, ?, key, val, func, gen, key
+                lua_pushcfunction(L, js_generator_string);
+                lua_pushvalue(L, 1);
+                lua_pushvalue(L, -4);
+                lua_call(L, 2, 0);
+
+
+                // RECURSIVE CALL:
+                // gen, obj, ?, key, val, func, gen, val
+                lua_pushcfunction(L, js_generator_value);
+                lua_pushvalue(L, 1);
+                lua_pushvalue(L, -3);
+                lua_call(L, 2, 0);
+
+                lua_pop(L, 1);
+            }
+        }
+        js_generator_close(L);
+        return 0;
+    case LUA_TNONE:
+        lua_pushfstring(L, "MissingArgument: second parameter to js_generator_value() must be defined at %s line %d", type, __FILE__, __LINE__);
+    default:
+        lua_pushfstring(L, "Unreachable: js_generator_value passed lua type (%d) not recognized at %s line %d", type, __FILE__, __LINE__);
+    }
+    // Shouldn't get here:
+    lua_error(L);
     return 0;
 }
 

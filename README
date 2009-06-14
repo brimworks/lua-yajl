@@ -25,6 +25,15 @@
 * THE SOFTWARE.
 **********************************************************************
 
+BUILDING:
+  Download make-common, yajl, and lua-yajl from:
+    http://github.com/brimworks/
+  Run:
+    export PATH="$PATH:/path/to/common/build-dir/bin"
+    for d in make-common yajl lua-yajl; do
+      cd $d && make BUILD=/path/to/common/build-dir
+    done
+
 TODO: Handle numbers larger than a double can represent??
 
 To use this library, you need yajl, get it here:
@@ -192,7 +201,8 @@ generator = yajl.generator {
                 coorced into strings using tostring() lua function.
                 The values are recursively traversed in depth first
                 fashion.  All keys that begin with two underscores are
-                ignored.
+                ignored.  An empty table is always treated as an empty
+                array.
 
         All other types are ignored (thread, userdata) unless there is
         an appropriate __gen_json metatable method.
