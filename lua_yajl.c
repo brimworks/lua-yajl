@@ -7,6 +7,8 @@
 #define js_check_generator(L, narg) \
     (yajl_gen*)luaL_checkudata((L), (narg), "yajl.generator.meta")
 
+static const char* js_null = "null";
+
 static int js_generator(lua_State *L);
 static int js_generator_value(lua_State *L);
 
@@ -94,7 +96,7 @@ static int js_parser_null(void *ctx) {
     lua_getfield(L, lua_upvalueindex(2), "value");
     if ( ! lua_isnil(L, -1) ) {
         lua_pushvalue(L, lua_upvalueindex(2));
-        lua_pushnil(L);
+        lua_pushlightuserdata(L, (void*)js_null);
         lua_pushliteral(L, "null");
         lua_call(L, 3, 0);
     } else {
@@ -539,11 +541,14 @@ static int js_generator_value(lua_State *L) {
         return js_generator_boolean(L);
     case LUA_TSTRING:
         return js_generator_string(L);
+    case LUA_TLIGHTUSERDATA:
+        if ( lua_topointer(L, 2) == js_null ) { 
+            return js_generator_null(L);
+        }
+    case LUA_TUSERDATA:
     case LUA_TTABLE:
     case LUA_TFUNCTION:
-    case LUA_TUSERDATA:
     case LUA_TTHREAD:
-    case LUA_TLIGHTUSERDATA:
         if ( luaL_getmetafield(L, 2, "__gen_json") ) {
             if  ( lua_isfunction(L, -1) ) {
                 lua_settop(L, 3); // gen, obj, func
@@ -735,6 +740,7 @@ static void js_create_parser_mt(lua_State *L) {
 
     lua_pop(L, 1); // <empty>
 }
+
 //////////////////////////////////////////////////////////////////////
 static void js_create_generator_mt(lua_State *L) {
     luaL_newmetatable(L, "yajl.generator.meta"); // {}
@@ -801,6 +807,9 @@ LUALIB_API int luaopen_yajl(lua_State *L) {
 
     lua_pushcfunction(L, js_generator);
     lua_setfield(L, -2, "generator");
+
+    lua_pushlightuserdata(L, (void*)js_null);
+    lua_setfield(L, -2, "null");
 
     return 1;
 }

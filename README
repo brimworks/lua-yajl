@@ -50,6 +50,13 @@ Loading the library:
 
 -- yajl functions --
 
+yajl.null
+
+    A light user data object that represents the JSON null value.  We
+    use this instead of nil to represent null since Lua tables can not
+    have a value of nil (that would delete the key-value pair), and
+    nil's can not exist at the end of an array.
+
 If you don't care about streaming, here are two convenience methods:
 
 string = yajl.to_string(lua_obj)
@@ -144,6 +151,9 @@ parser = yajl.parser {
             "double"  - A JSON double was found.
             "null"    - A JSON null was found.
 
+        Note that nulls are NOT represented as a Lua nil value,
+        instead they are the yajl.null value.
+
     events:open_object()
 
         An open object brace was found.
@@ -188,6 +198,8 @@ generator = yajl.generator {
 
             number/boolean/string - Generates an appropriate JSON
                 representation.
+
+            nil/yajl.null - Generates a JSON null representation.
 
             metatable(lua_object).__gen_json(lua_object, generator) -
                 If the lua_object has a metatable with a __gen_json
