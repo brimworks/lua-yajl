@@ -34,12 +34,16 @@ BUILDING:
       cd $d && make BUILD=/path/to/common/build-dir
     done
 
-TODO: Handle numbers larger than a double can represent??
+NOTES:
 
-To use this library, you need yajl, get it here:
-     http://lloyd.github.com/yajl/
+  * lua-yajl currently depends on a fork of YAJL that provides
+    support for custom printer function when generating JSON and uses
+    the make-common build system because I prefer it.  The original
+    YAJL can be downloaded here:
 
-Loading the library:
+      http://lloyd.github.com/yajl/
+
+  * To load the library, do one of these two things:
 
     If you built the library as a loadable package
         [local] yajl = require 'yajl'
@@ -48,7 +52,15 @@ Loading the library:
     the function "luaopen_yajl(L)". It will create a table with the yajl
     functions and leave it on the stack.
 
--- yajl functions --
+  * JSON integers and floating points are handled with the 'double' C
+    type, which is normally the native number format for Lua.  We do
+    NOT currently do error handling if a number is outside of range,
+    instead the number will be truncated as specified by the strtod()
+    C function.  At some point in the future perhaps we will add
+    support for custom error handlers if a double can not accurately
+    represent the JSON number.  (want to write this support!?)
+
+-- yajl table (result of require 'yajl') --
 
 yajl.null
 
@@ -61,17 +73,14 @@ If you don't care about streaming, here are two convenience methods:
 
 string = yajl.to_string(lua_obj)
 
-    Simple interface that simply executes this code:
+    Translate a lua object into a JSON representation by creating a
+    generator and calling the 'value' method with the passed in
+    lua_obj and returns the result.
 
-    function to_string(lua_obj)
-        local string
-        generator = yajl.generator({
-            printer: function(buffer) string = string .. buffer end,
-        }):value(lua_obj)
-        return string
-    end
 
-lua_obj = yajl.to_value(string)
+TODO: lua_obj = yajl.to_value(string)
+
+   >>VAPORWARE<<
 
     Simple interface that simply executes this code:
 
@@ -229,8 +238,12 @@ generator = yajl.generator {
 
     generator = generator:number(number)
 
-        Generate a number JSON representation (integer representation
-        if possible, otherwise chooses double representation).
+        Generate a number JSON representation.  If the number is
+        infinity, we will generate the special 1e+666 number.  If the
+        number is NAN (not a number), then we generate -0.  At least
+        this way there is minimal information loss (since 1e+666 can
+        not be represented in a double, that will be re-encoded as
+        infinity).
 
     generator = generator:string(string)
 

@@ -1,4 +1,4 @@
-print "1..6"
+print "1..5"
 
 local tap   = require("tap")
 local yajl  = require("yajl")
@@ -6,7 +6,9 @@ local ok    = tap.ok
 
 function main()
    test_simple()
-   nil_at_end_of_array();
+   null_at_end_of_array()
+   null_object_value()
+   weird_numbers()
 end
 
 function to_value(string)
@@ -65,11 +67,27 @@ function test_simple()
    ok(expect == got, expect .. " == " .. tostring(got))
 end
 
-function nil_at_end_of_array()
-   -- TODO: How to represent the fact that nil can not be stored in a table!?
+function null_at_end_of_array()
    local expect = '["something",null]'
    local got = yajl.to_string(to_value(expect))
    ok(expect == got, expect .. " == " .. tostring(got))
+end
+
+function null_object_value()
+   local expect = '{"something":null}'
+   local got = yajl.to_string(to_value(expect))
+   ok(expect == got, expect .. " == " .. tostring(got))
+end
+
+function weird_numbers()
+   -- See note in README about how we are broken when it comes to big numbers.
+   local expect = '[1e+666,-1e+666,-0]'
+   local got = yajl.to_string(to_value(expect))
+   ok(expect == got, expect .. " == " .. tostring(got))
+
+   local nan = 0/0
+   got = yajl.to_string { nan };
+   ok("[-0]" == got, "NaN converts to -0 (got: " .. got .. ")")
 end
 
 main()

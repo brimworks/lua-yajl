@@ -3,6 +3,9 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <math.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
 
 #define js_check_generator(L, narg) \
     (yajl_gen*)luaL_checkudata((L), (narg), "yajl.generator.meta")
@@ -124,31 +127,31 @@ static int js_parser_boolean(void *ctx, int val) {
 }
 
 //////////////////////////////////////////////////////////////////////
-static int js_parser_integer(void *ctx, long val) {
+static int js_parser_number(void *ctx, const char* buffer, unsigned int buffer_len) {
     lua_State *L=(lua_State*)ctx;
 
     lua_getfield(L, lua_upvalueindex(2), "value");
     if ( ! lua_isnil(L, -1) ) {
-        lua_pushvalue(L, lua_upvalueindex(2));
-        lua_pushinteger(L, val);
-        lua_pushliteral(L, "integer");
-        lua_call(L, 3, 0);
-    } else {
+        // Convert into number using a temporary buffer:
+        char* tmp = (char*)lua_newuserdata(L, buffer_len+1);
+        memcpy(tmp, buffer, buffer_len);
+        tmp[buffer_len] = '\0';
+        double num = strtod(tmp, NULL);
+/*
+        if ((num == HUGE_VAL || num == -HUGE_VAL) &&
+            errno == ERANGE)
+        {
+            TODO: Add appropriate handling of large numbers by delegating.
+        }
+        TODO: How can we tell if there was information loss?  aka the
+            number of significant digits in the string exceeds the
+            significant digits in the double.
+*/
         lua_pop(L, 1);
-    }
 
-    return 1;
-}
-
-//////////////////////////////////////////////////////////////////////
-static int js_parser_double(void *ctx, double val) {
-    lua_State *L=(lua_State*)ctx;
-
-    lua_getfield(L, lua_upvalueindex(2), "value");
-    if ( ! lua_isnil(L, -1) ) {
         lua_pushvalue(L, lua_upvalueindex(2));
-        lua_pushnumber(L, val);
-        lua_pushliteral(L, "double");
+        lua_pushnumber(L, num);
+        lua_pushliteral(L, "integer");
         lua_call(L, 3, 0);
     } else {
         lua_pop(L, 1);
@@ -256,9 +259,9 @@ static int js_parser_end_array(void *ctx) {
 static yajl_callbacks js_parser_callbacks = {
     js_parser_null,
     js_parser_boolean,
-    js_parser_integer,
-    js_parser_double,
     NULL,
+    NULL,
+    js_parser_number,
     js_parser_string,
     js_parser_start_map,
     js_parser_map_key,
@@ -427,8 +430,32 @@ static int js_generator_double(lua_State *L) {
 
 //////////////////////////////////////////////////////////////////////
 static int js_generator_number(lua_State *L) {
+
+    // It would be better to make it so an arbitrary string can be
+    // used here, however we would then need to validate that the
+    // generated string is a JSON number which is a bit beyond scope
+    // at this point.  Perhaps in the future we will loosen this
+    // restriction, it is always easier to loosen restrictions than it
+    // is to make new restrictions that break other people's code.
+    double num = luaL_checknumber(L, 2);
+
     size_t len;
-    const char* str = luaL_checklstring(L, 2, &len);
+    const char* str;
+
+    // These are special cases, not sure how better to represent them
+    // :-(.
+    if ( num == HUGE_VAL ) {
+        str = "1e+666";
+        len = 6;
+    } else if ( num == -HUGE_VAL ) {
+        str = "-1e+666";
+        len = 7;
+    } else if ( isnan(num) ) {
+        str = "-0"; 
+        len = 2;
+   } else {
+        str = luaL_checklstring(L, 2, &len);
+    }
     js_generator_assert(L,
                         yajl_gen_number(*js_check_generator(L, 1),
                                         str, len),
