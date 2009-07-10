@@ -4,7 +4,7 @@ include $(make-common.dir)/tool/cc.mk
 include $(make-common.dir)/tool/lua.mk
 include $(make-common.dir)/layout.mk
 
-_lib  := $(lua.lib.dir)/yajl.so
+_lib  := $(lua.c.lib.dir)/yajl.so
 _objs := $(call cc.c.to.o,$(addprefix $(_pwd)/, \
     lua_yajl.c \
 ))
