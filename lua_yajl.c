@@ -613,8 +613,9 @@ static int js_generator_value(lua_State *L) {
         }
 
         if ( is_array ) {
+            int i;
             js_generator_open_array(L);
-            for ( int i=1; i <= max; i++ ) {
+            for ( i=1; i <= max; i++ ) {
                 lua_pushinteger(L, i);
                 lua_gettable(L, 2);
 

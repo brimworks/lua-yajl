@@ -25,25 +25,13 @@
 * THE SOFTWARE.
 **********************************************************************
 
-BUILDING:
-  Download make-common, yajl, and lua-yajl from:
-    http://github.com/brimworks/
-  Run:
-    export PATH="$PATH:/path/to/common/build-dir/bin"
-    for d in make-common yajl lua-yajl; do
-      cd $d && make BUILD=/path/to/common/build-dir
-    done
+To use this library, you need yajl version 1.0.9 or newer, get it here:
+     http://lloyd.github.com/yajl/
 
-NOTES:
+To build this library, you need CMake, get it here:
+    http://www.cmake.org/cmake/resources/software.html
 
-  * lua-yajl currently depends on a fork of YAJL that provides
-    support for custom printer function when generating JSON and uses
-    the make-common build system because I prefer it.  The original
-    YAJL can be downloaded here:
-
-      http://lloyd.github.com/yajl/
-
-  * To load the library, do one of these two things:
+Loading the library:
 
     If you built the library as a loadable package
         [local] yajl = require 'yajl'
@@ -52,7 +40,9 @@ NOTES:
     the function "luaopen_yajl(L)". It will create a table with the yajl
     functions and leave it on the stack.
 
-  * JSON integers and floating points are handled with the 'double' C
+NOTE ON LARGE NUMBERS:
+
+    JSON integers and floating points are handled with the 'double' C
     type, which is normally the native number format for Lua.  We do
     NOT currently do error handling if a number is outside of range,
     instead the number will be truncated as specified by the strtod()
@@ -60,7 +50,7 @@ NOTES:
     support for custom error handlers if a double can not accurately
     represent the JSON number.  (want to write this support!?)
 
--- yajl table (result of require 'yajl') --
+-- yajl functions --
 
 yajl.null
 
