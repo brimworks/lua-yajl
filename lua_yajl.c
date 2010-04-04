@@ -10,10 +10,43 @@
 #define js_check_generator(L, narg) \
     (yajl_gen*)luaL_checkudata((L), (narg), "yajl.generator.meta")
 
-static const char* js_null = "null";
+static void* js_null;
 
 static int js_generator(lua_State *L);
 static int js_generator_value(lua_State *L);
+static void js_parser_assert(lua_State* L,
+                             yajl_status status,
+                             yajl_handle* handle,
+                             const unsigned char* json_text,
+                             unsigned int json_text_len,
+                             int expect_complete,
+                             const char* file,
+                             int line);
+static int got_map_key(lua_State* L);
+static int got_map_value(lua_State* L);
+
+
+//////////////////////////////////////////////////////////////////////
+static double todouble(lua_State* L, const char* val, unsigned int len) {
+    // Convert into number using a temporary:
+    char* tmp = (char*)lua_newuserdata(L, len+1);
+    memcpy(tmp, val, len);
+    tmp[len] = '\0';
+    double num = strtod(tmp, NULL);
+/*
+        if ((num == HUGE_VAL || num == -HUGE_VAL) &&
+            errno == ERANGE)
+        {
+            TODO: Add appropriate handling of large numbers by delegating.
+        }
+        TODO: How can we tell if there was information loss?  aka the
+            number of significant digits in the string exceeds the
+            significant digits in the double.
+*/
+    lua_pop(L, 1);
+    return num;
+}
+
 
 //////////////////////////////////////////////////////////////////////
 static int js_to_string(lua_State *L) {
@@ -50,47 +83,177 @@ static int js_to_string(lua_State *L) {
     return 1;
 }
 
+static int to_value_null(void* ctx) {
+    lua_State* L = (lua_State*)ctx;
+
+    lua_getfield(L, LUA_REGISTRYINDEX, "yajl.null");
+    (lua_tocfunction(L, -2))(L);
+
+    return 1;
+}
+
+static int to_value_boolean(void* ctx, int val) {
+    lua_State* L = (lua_State*)ctx;
+
+    lua_pushboolean(L, val);
+    (lua_tocfunction(L, -2))(L);
+
+    return 1;
+}
+
+static int to_value_number(void* ctx, const char* val, unsigned int len) {
+    lua_State* L = (lua_State*)ctx;
+
+    lua_pushnumber(L, todouble(L, val, len));
+    (lua_tocfunction(L, -2))(L);
+
+    return 1;
+}
+
+static int to_value_string(void* ctx, const unsigned char *val, unsigned int len) {
+    lua_State* L = (lua_State*)ctx;
+
+    lua_pushlstring(L, (const char*)val, len);
+    (lua_tocfunction(L, -2))(L);
+
+    return 1;
+}
+
+static int got_map_value(lua_State* L) {
+    /* ..., Table, Key, Func, Value */
+    lua_insert(L, -2);
+    lua_pop(L, 1);
+    lua_rawset(L, -3);
+    lua_pushnil(L); // Store future key here.
+    lua_pushcfunction(L, got_map_key);
+
+    return 0; // Ignored.
+}
+
+static int got_map_key(lua_State* L) {
+    lua_replace(L, -3);
+    lua_pop(L, 1);
+    lua_pushcfunction(L, got_map_value);
+
+    return 0; // Ignored.
+}
+
+static int got_array_value(lua_State* L) {
+    /* ..., Table, Integer, Func, Value */
+    lua_rawseti(L, -4, lua_tointeger(L, -3));
+    lua_pushinteger(L, lua_tointeger(L, -2)+1);
+    lua_replace(L, -3);
+}
+
+static int to_value_start_map(void* ctx) {
+    lua_State* L = (lua_State*)ctx;
+
+    /* The layout of the stack for "objects" is:
+       - Table we are appending to.
+       - Storage for the "last key found".
+       - Function to call in to_value_* functions.
+       - Value pushed on the stack by to_value_* functions.
+    */
+    if ( ! lua_checkstack(L, 4) ) {
+        // TODO: So far, YAJL seems to be fine with the longjmp, but
+        // perhaps we should do errors a different way?
+        return luaL_error(L, "lua stack overflow");
+    }
+
+    lua_newtable(L);
+    lua_pushnil(L); // Store future key here.
+    lua_pushcfunction(L, got_map_key);
+
+    return 1;
+}
+
+static int to_value_start_array(void* ctx) {
+    lua_State* L = (lua_State*)ctx;
+
+    /* The layout of the stack for "arrays" is:
+       - Table we are appending to.
+       - The index to use for the next insertion.
+       - Function to call in to_value_* functions.
+       - Value pushed on the stack by to_value_* functions.
+    */
+    if ( ! lua_checkstack(L, 4) ) {
+        // TODO: So far, YAJL seems to be fine with the longjmp, but
+        // perhaps we should do errors a different way?
+        return luaL_error(L, "lua stack overflow");
+    }
+
+    lua_newtable(L);
+    lua_pushinteger(L, 1);
+    lua_pushcfunction(L, got_array_value);
+
+    return 1;
+}
+
+static int to_value_end(void* ctx) {
+    lua_State* L = (lua_State*)ctx;
+
+    // Simply pop the stack and call the cfunction:
+    lua_pop(L, 2);
+    (lua_tocfunction(L, -2))(L);
+
+    return 1;
+}
+
+static int noop(lua_State* L) {
+    return 0;
+}
+
+static yajl_callbacks js_to_value_callbacks = {
+    to_value_null,
+    to_value_boolean,
+    NULL,
+    NULL,
+    to_value_number,
+    to_value_string,
+    to_value_start_map,
+    to_value_string,
+    to_value_end,
+    to_value_start_array,
+    to_value_end,
+};
+
 //////////////////////////////////////////////////////////////////////
 static int js_to_value(lua_State *L) {
-    // TODO: implement me
-/*
-    function to_value(string)
-        local result
-        local stack = {
-            function(val) result = val end
-        }
-        local obj_key
-        local events = {
-            value: function(_, val)
-                stack[#stack](val)
-            end,
-            open_array: function()
-                local arr = {}
-                stack[#stack](arr)
-                table.insert(stack, function(val)
-                    table.insert(result, val)
-                end)
-            end,
-            open_object: function()
-                local obj = {}
-                stack[#stack](obj)
-                table.insert(stack, function(val)
-                    obj[obj_key] = val
-                end)
-            end,
-            object_key: function(_, val)
-                obj_key = val
-            end,
-            close: function()
-                stack[#stack] = nil
-            end,
-        }
+    yajl_parser_config   cfg = { 1, 1 };
+    yajl_handle          handle;
+    size_t               len;
+    const unsigned char* buff = (const unsigned char*) luaL_checklstring(L, 1, &len);
+    int                  expect_complete = 1;
 
-        yajl.parser({ events: events })(string)
-        return result
-    end
-*/
-    return 0;
+    if ( NULL == buff ) return 0;
+
+    if ( lua_istable(L, 2) ) {
+        lua_getfield(L, 2, "allow_comments");
+        if ( ! lua_isnil(L, -1) ) {
+            cfg.allowComments = lua_toboolean(L, -1);
+        }
+        lua_pop(L, 1);
+
+        lua_getfield(L, 2, "check_utf8");
+        if ( ! lua_isnil(L, -1) ) {
+            cfg.checkUTF8 = lua_toboolean(L, -1);
+        }
+        lua_pop(L, 1);
+    }
+
+    handle = yajl_alloc(&js_to_value_callbacks, &cfg, NULL, (void*)L);
+    lua_pushcfunction(L, noop);
+
+    js_parser_assert(L,
+                     yajl_parse(handle, buff, len),
+                     &handle,
+                     buff,
+                     len,
+                     expect_complete,
+                     __FILE__,
+                     __LINE__);
+
+    return 1;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -99,7 +262,7 @@ static int js_parser_null(void *ctx) {
     lua_getfield(L, lua_upvalueindex(2), "value");
     if ( ! lua_isnil(L, -1) ) {
         lua_pushvalue(L, lua_upvalueindex(2));
-        lua_pushlightuserdata(L, (void*)js_null);
+        lua_getfield(L, LUA_REGISTRYINDEX, "yajl.null");
         lua_pushliteral(L, "null");
         lua_call(L, 3, 0);
     } else {
@@ -132,26 +295,9 @@ static int js_parser_number(void *ctx, const char* buffer, unsigned int buffer_l
 
     lua_getfield(L, lua_upvalueindex(2), "value");
     if ( ! lua_isnil(L, -1) ) {
-        // Convert into number using a temporary buffer:
-        char* tmp = (char*)lua_newuserdata(L, buffer_len+1);
-        memcpy(tmp, buffer, buffer_len);
-        tmp[buffer_len] = '\0';
-        double num = strtod(tmp, NULL);
-/*
-        if ((num == HUGE_VAL || num == -HUGE_VAL) &&
-            errno == ERANGE)
-        {
-            TODO: Add appropriate handling of large numbers by delegating.
-        }
-        TODO: How can we tell if there was information loss?  aka the
-            number of significant digits in the string exceeds the
-            significant digits in the double.
-*/
-        lua_pop(L, 1);
-
         lua_pushvalue(L, lua_upvalueindex(2));
-        lua_pushnumber(L, num);
-        lua_pushliteral(L, "integer");
+        lua_pushnumber(L, todouble(L, buffer, buffer_len));
+        lua_pushliteral(L, "number");
         lua_call(L, 3, 0);
     } else {
         lua_pop(L, 1);
@@ -568,11 +714,11 @@ static int js_generator_value(lua_State *L) {
         return js_generator_boolean(L);
     case LUA_TSTRING:
         return js_generator_string(L);
-    case LUA_TLIGHTUSERDATA:
+    case LUA_TUSERDATA:
         if ( lua_topointer(L, 2) == js_null ) { 
             return js_generator_null(L);
         }
-    case LUA_TUSERDATA:
+    case LUA_TLIGHTUSERDATA:
     case LUA_TTABLE:
     case LUA_TFUNCTION:
     case LUA_TTHREAD:
@@ -586,6 +732,7 @@ static int js_generator_value(lua_State *L) {
             }
             lua_pop(L, 1);
         }
+
         // Simply ignore it, perhaps we should warn?
         if ( type != LUA_TTABLE ) return 0;
 
@@ -633,10 +780,20 @@ static int js_generator_value(lua_State *L) {
 
             lua_pushnil(L);
             while ( lua_next(L, 2) != 0 ) {
+                size_t      len;
+                const char* str;
+
                 // gen, obj, ?, key, val, func, gen, key
                 lua_pushcfunction(L, js_generator_string);
                 lua_pushvalue(L, 1);
-                lua_pushvalue(L, -4);
+                if ( lua_isstring(L, -4) ) {
+                    lua_pushvalue(L, -4);
+                } else {
+                    // Must coerce into a string:
+                    lua_getglobal(L, "tostring");
+                    lua_pushvalue(L, -5);
+                    lua_call(L, 1, 1);
+                }
                 lua_call(L, 2, 0);
 
 
@@ -705,7 +862,7 @@ static int js_generator(lua_State *L) {
         lua_pushvalue(L, -1);
 
         // {args}, ?, tbl, printer, printer
-        lua_setfield(L, -2, "printer");
+        lua_setfield(L, -3, "printer");
 
         js_printer_ctx* print_ctx = (js_printer_ctx*)
             lua_newuserdata(L, sizeof(js_printer_ctx));
@@ -773,6 +930,9 @@ static void js_create_parser_mt(lua_State *L) {
 static void js_create_generator_mt(lua_State *L) {
     luaL_newmetatable(L, "yajl.generator.meta"); // {}
 
+    lua_pushvalue(L, -1);
+    lua_setfield(L, -2, "__index");
+
     lua_pushcfunction(L, js_generator_delete);
     lua_setfield(L, -2, "__gc");
 
@@ -809,10 +969,26 @@ static void js_create_generator_mt(lua_State *L) {
     lua_pop(L, 1); // <empty>
 }
 
+static int js_null_tostring(lua_State* L) {
+    lua_pushstring(L, "null");
+    return 1;
+}
+
+//////////////////////////////////////////////////////////////////////
+static void js_create_null_mt(lua_State *L) {
+    luaL_newmetatable(L, "yajl.null.meta"); // {}
+
+    lua_pushcfunction(L, js_null_tostring);
+    lua_setfield(L, -2, "__tostring");
+
+    lua_pop(L, 1); // <empty>
+}
+
 //////////////////////////////////////////////////////////////////////
 LUALIB_API int luaopen_yajl(lua_State *L) {
     js_create_parser_mt(L);
     js_create_generator_mt(L);
+    js_create_null_mt(L);
 
     // Create the yajl.refs weak table:
     lua_createtable(L, 0, 2);
@@ -836,7 +1012,13 @@ LUALIB_API int luaopen_yajl(lua_State *L) {
     lua_pushcfunction(L, js_generator);
     lua_setfield(L, -2, "generator");
 
-    lua_pushlightuserdata(L, (void*)js_null);
+    js_null = lua_newuserdata(L, 0);
+    luaL_getmetatable(L, "yajl.null.meta");
+    lua_setmetatable(L, -2);
+
+    lua_pushvalue(L, -1);
+    lua_setfield(L, LUA_REGISTRYINDEX, "yajl.null");
+
     lua_setfield(L, -2, "null");
 
     return 1;

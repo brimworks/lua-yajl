@@ -65,14 +65,15 @@ string = yajl.to_string(lua_obj)
 
     Translate a lua object into a JSON representation by creating a
     generator and calling the 'value' method with the passed in
-    lua_obj and returns the result.
+    lua_obj and returns the result.  See generator:value() for more
+    information about this operation.  Note that information loss
+    may happen in certain situations.  For example, empty tables are
+    always translated into empty arrays.
 
+lua_obj = yajl.to_value(string)
 
-TODO: lua_obj = yajl.to_value(string)
-
-   >>VAPORWARE<<
-
-    Simple interface that simply executes this code:
+    Translate a string to a lua object.  This is done in C by running
+    code that is essentially the same as this (but faster):
 
     function to_value(string)
         local result
@@ -146,8 +147,7 @@ parser = yajl.parser {
 
             "string"  - A JSON string was found.
             "boolean" - A JSON true or false was found.
-            "integer" - A JSON integer was found.
-            "double"  - A JSON double was found.
+            "number"  - A JSON number was found.
             "null"    - A JSON null was found.
 
         Note that nulls are NOT represented as a Lua nil value,

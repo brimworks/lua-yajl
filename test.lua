@@ -13,6 +13,8 @@ function main()
    null_at_end_of_array()
    null_object_value()
    weird_numbers()
+   test_generator()
+   test_to_value()
 end
 
 function to_value(string)
@@ -53,6 +55,56 @@ function to_value(string)
    return result
 end
 
+function test_to_value()
+   local json = '[["float",1.5,"integer",5,"string","hello","empty",[],"false",false,"custom","custom json serializer","ostr_key",{"key":"value"},"obool_key",{"true":true},"onull_key",{"null":null}],10,10.3,10.3,"a string",null,false,true]'
+   local val = yajl.to_value(json)
+   local got = yajl.to_string(val);
+
+   ok(got == json,
+      "yajl.to_value(" .. json .. ") -> " .. got)
+end
+
+function test_generator()
+   local strings = {}
+   local generator = yajl.generator {
+      printer = function(string)
+                  table.insert(strings, string)
+               end
+   }
+
+   local custom = { __gen_json = function(self, gen)
+                                    gen:string("custom json serializer")
+                                 end
+                 }
+   setmetatable(custom, custom)
+
+   generator:open_array()
+   generator:value({  "float",  1.5,
+                      "integer", 5,
+                      "string", "hello",
+                      "empty", {}, -- defaults to an empty array.
+                      "false", false,
+                      "custom", custom,
+                      "ostr_key", { key = "value" },
+                      "obool_key", { [true] = true },
+                      "onull_key", { [yajl.null] = yajl.null },
+                   })
+   generator:integer(10.3)
+   generator:double(10.3)
+   generator:number(10.3)
+   generator:string("a string")
+   generator:null()
+   generator:boolean(false)
+   generator:boolean(true)
+   generator:open_object()
+   generator:close()
+   generator:close()
+
+   local expect = '[["float",1.5,"integer",5,"string","hello","empty",[],"false",false,"custom","custom json serializer","ostr_key",{"key":"value"},"obool_key",{"true":true},"onull_key",{"null":null}],10,10.3,10.3,"a string",null,false,true,{}]'
+   local got = table.concat(strings)
+   ok(expect == got, expect .. " == " .. got)
+end
+
 function test_simple()
    local expect =
       '['..
@@ -62,11 +114,11 @@ function test_simple()
       '"false",false,'..
       '"null",null,'..
       '"string","hello",'..
-      '"array",[],'..
+      '"array",[1,2],'..
       '"object",{"key":"value"}'..
       ']'
 
-   -- Input to deflate is same as output to inflate:
+   -- Input to to_value matches the output of to_string:
    local got = yajl.to_string(to_value(expect))
    ok(expect == got, expect .. " == " .. tostring(got))
 end
