@@ -744,7 +744,7 @@ static int js_generator_value(lua_State *L) {
         // First iterate over the table to see if it is an array:
         lua_pushnil(L);
         while ( lua_next(L, 2) != 0 ) {
-            if ( lua_isnumber(L, -2) ) {
+            if ( lua_type(L, -2) == LUA_TNUMBER ) {
                 double num = lua_tonumber(L, -2);
                 if ( num == floor(num) ) {
                     if ( num > max ) max = num;

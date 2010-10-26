@@ -13,6 +13,7 @@ function main()
    null_at_end_of_array()
    null_object_value()
    weird_numbers()
+   number_in_string()
    test_generator()
    test_to_value()
 end
@@ -144,6 +145,13 @@ function weird_numbers()
    local nan = 0/0
    got = yajl.to_string { nan };
    ok("[-0]" == got, "NaN converts to -0 (got: " .. got .. ")")
+end
+
+function number_in_string()
+   -- Thanks to agentzh for this bug report!
+   local expect = '{"2":"two"}'
+   local got = yajl.to_string {["2"]="two"}
+   ok(expect == got, expect .. " == " .. tostring(got))
 end
 
 main()
