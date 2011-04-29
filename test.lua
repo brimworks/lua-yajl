@@ -101,7 +101,7 @@ function test_generator()
    generator:close()
    generator:close()
 
-   local expect = '[["float",1.5,"integer",5,"string","hello","empty",[],"false",false,"custom","custom json serializer","ostr_key",{"key":"value"},"obool_key",{"true":true},"onull_key",{"null":null}],10,10.3,10.3,"a string",null,false,true,{}]'
+   local expect = '[["float",1.5,"integer",5,"string","hello","empty",[],"false",false,"custom","custom json serializer","ostr_key",{"key":"value"},"obool_key",{"true":true},"onull_key",{"null":null}],10,10.300000000000000711,10.3,"a string",null,false,true,{}]'
    local got = table.concat(strings)
    ok(expect == got, expect .. " == " .. got)
 end

@@ -887,11 +887,15 @@ static int js_generator(lua_State *L) {
     yajl_gen* handle = (yajl_gen*)lua_newuserdata(L, sizeof(yajl_gen));
     *handle = yajl_gen_alloc(NULL);
 
+    if ( print ) {
+        yajl_gen_config(*handle, yajl_gen_print_callback, print, ctx);
+    }
+
     // Get the indent and save so it isn't gc'ed:
     lua_getfield(L, 1, "indent");
     if ( ! lua_isnil(L, -1) ) {
-        yajl_config(*handle, yajl_gen_beautify, 1);
-        yajl_config(*handle, yajl_gen_indent_string, lua_tostring(L, -1));
+        yajl_gen_config(*handle, yajl_gen_beautify, 1);
+        yajl_gen_config(*handle, yajl_gen_indent_string, lua_tostring(L, -1));
         lua_setfield(L, -2, "indent");
     } else {
         lua_pop(L, 1);
