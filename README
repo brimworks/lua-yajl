@@ -25,7 +25,7 @@
 * THE SOFTWARE.
 **********************************************************************
 
-To use this library, you need yajl version 1.0.9 or newer, get it here:
+To use this library, you need yajl version 2.x, get it here:
      http://lloyd.github.com/yajl/
 
 To build this library, you need CMake, get it here:
