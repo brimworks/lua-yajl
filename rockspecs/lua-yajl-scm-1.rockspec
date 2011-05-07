@@ -1,7 +1,7 @@
 package = "lua-yajl"
 version = "scm-1"
 source = {
-	url = "https://github.com/brimworks/lua-yajl.git",
+	url = "git://github.com/brimworks/lua-yajl.git",
 }
 description = {
 	summary = "Integrate the yajl JSON library with Lua.",
