@@ -1,8 +1,8 @@
 package = "lua-yajl"
-version = "1.2-1"
+version = "2.0-1"
 source = {
 	url = "git://github.com/brimworks/lua-yajl.git",
-	branch = "v1.2",
+	branch = "v2.0",
 }
 description = {
 	summary = "Integrate the yajl JSON library with Lua.",
