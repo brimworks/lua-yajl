@@ -28,8 +28,18 @@
 To use this library, you need yajl version 2.x, get it here:
      http://lloyd.github.com/yajl/
 
-To build this library, you need CMake, get it here:
+To build this library, you can use CMake (which is how yajl is built):
     http://www.cmake.org/cmake/resources/software.html
+
+...or you can use lua rocks.
+
+...or you can use GNU Make.  If the headers and/or library are
+installed in non-standard locations, simply set the LIBDIR and/or
+INCDIR make variables.  For example:
+
+  make macosx \
+      LIBDIR='-L/opt/lua/lib -L/opt/yajl/lib' \
+      INCDIR='-I/opt/lua/include -I/opt/yajl/include'
 
 Loading the library:
 
