@@ -84,6 +84,7 @@ static int js_to_string(lua_State *L) {
     return 1;
 }
 
+/* See STRATEGY section below */
 static int to_value_null(void* ctx) {
     lua_State* L = (lua_State*)ctx;
 
@@ -93,6 +94,7 @@ static int to_value_null(void* ctx) {
     return 1;
 }
 
+/* See STRATEGY section below */
 static int to_value_boolean(void* ctx, int val) {
     lua_State* L = (lua_State*)ctx;
 
@@ -102,6 +104,7 @@ static int to_value_boolean(void* ctx, int val) {
     return 1;
 }
 
+/* See STRATEGY section below */
 static int to_value_number(void* ctx, const char* val, size_t len) {
     lua_State* L = (lua_State*)ctx;
 
@@ -111,6 +114,7 @@ static int to_value_number(void* ctx, const char* val, size_t len) {
     return 1;
 }
 
+/* See STRATEGY section below */
 static int to_value_string(void* ctx, const unsigned char *val, size_t len) {
     lua_State* L = (lua_State*)ctx;
 
@@ -120,6 +124,7 @@ static int to_value_string(void* ctx, const unsigned char *val, size_t len) {
     return 1;
 }
 
+/* See STRATEGY section below */
 static int got_map_value(lua_State* L) {
     /* ..., Table, Key, Func, Value */
     lua_insert(L, -2);
@@ -131,6 +136,7 @@ static int got_map_value(lua_State* L) {
     return 0; /* Ignored. */
 }
 
+/* See STRATEGY section below */
 static int got_map_key(lua_State* L) {
     lua_replace(L, -3);
     lua_pop(L, 1);
@@ -139,6 +145,7 @@ static int got_map_key(lua_State* L) {
     return 0; /* Ignored. */
 }
 
+/* See STRATEGY section below */
 static int got_array_value(lua_State* L) {
     /* ..., Table, Integer, Func, Value */
     lua_rawseti(L, -4, lua_tointeger(L, -3));
@@ -148,6 +155,7 @@ static int got_array_value(lua_State* L) {
     return 0; /* Ignored. */
 }
 
+/* See STRATEGY section below */
 static int to_value_start_map(void* ctx) {
     lua_State* L = (lua_State*)ctx;
 
@@ -170,6 +178,7 @@ static int to_value_start_map(void* ctx) {
     return 1;
 }
 
+/* See STRATEGY section below */
 static int to_value_start_array(void* ctx) {
     lua_State* L = (lua_State*)ctx;
 
@@ -192,6 +201,7 @@ static int to_value_start_array(void* ctx) {
     return 1;
 }
 
+/* See STRATEGY section below */
 static int to_value_end(void* ctx) {
     lua_State* L = (lua_State*)ctx;
 
@@ -202,10 +212,12 @@ static int to_value_end(void* ctx) {
     return 1;
 }
 
+/* See STRATEGY section below */
 static int noop(lua_State* L) {
     return 0;
 }
 
+/* See STRATEGY section below */
 static yajl_callbacks js_to_value_callbacks = {
     to_value_null,
     to_value_boolean,
@@ -221,6 +233,52 @@ static yajl_callbacks js_to_value_callbacks = {
 };
 
 
+/* STRATEGY:
+ *
+ * Each of the js_to_value_callbacks perform these actions:
+ *
+ * [1] Push a new value onto the top of the Lua stack.
+ *
+ * [2] Call the function that was at the top of the Lua stack before
+ *     step [1] occurred.
+ *
+ * The purpose of the function call in [2] is to take the value at the
+ * top of the stack and store it in the appropriate location.
+ * Initially, the function is the noop (no operation) function which
+ * does nothing.  Therefore we know that the final result is on the
+ * top of the Lua stack.
+ *
+ * The to_value_start_map and to_value_start_array callbacks are
+ * different since they need to use a bit of the Lua stack to store
+ * some state information.  When these callbacks are ran, they perform
+ * these actions:
+ *
+ * [a] Push a new table which will represent the final "array" or
+ *     "object" onto the top of the Lua stack.
+ *
+ * [b] Allocate space for the "key" (in the case of arrays, this is
+ *     the index into the array to use as part of the next insertion)
+ *
+ * [c] Push the got_array_value or got_map_key function.
+ *
+ * The got_array_value function will take the value at the top of the
+ * stack and insert it into the table created in step [a].  It will
+ * then increment the index created in step [b].  As a final step, it
+ * removes the value at the top of the stack.
+ *
+ * The got_map_key function simply takes the value at the top of the
+ * stack and stores it in the space allocated by step [b] above.  It
+ * then replaces the function pushed onto the stack by step [c] with
+ * the got_map_value function.  As a final step, it removes the value
+ * at the top of the stack.
+ *
+ * The got_map_value function takes the value at the top of the stack
+ * and inserts it into the table created in step [a] with the key
+ * whose space was allocated in step [b].  The function pushed onto
+ * the stack by step [c] is then restored back to the got_map_key
+ * function.  As a final step, it removes the value at the top of the
+ * stack.
+ */
 static int js_to_value(lua_State *L) {
     yajl_handle          handle;
     size_t               len;
