@@ -26,13 +26,13 @@ static int got_map_key(lua_State* L);
 static int got_map_value(lua_State* L);
 
 
-//////////////////////////////////////////////////////////////////////
 static double todouble(lua_State* L, const char* val, size_t len) {
-    // Convert into number using a temporary:
+    /* Convert into number using a temporary */
     char* tmp = (char*)lua_newuserdata(L, len+1);
+    double num;
     memcpy(tmp, val, len);
     tmp[len] = '\0';
-    double num = strtod(tmp, NULL);
+    num = strtod(tmp, NULL);
 /*
         if ((num == HUGE_VAL || num == -HUGE_VAL) &&
             errno == ERANGE)
@@ -48,36 +48,37 @@ static double todouble(lua_State* L, const char* val, size_t len) {
 }
 
 
-//////////////////////////////////////////////////////////////////////
 static int js_to_string(lua_State *L) {
+    yajl_gen* gen;
+    const unsigned char *buf;
+    size_t len;
+
     lua_pushcfunction(L, js_generator);
-    // convert_me, {extra}, ?, js_gen
+    /* convert_me, {extra}, ?, js_gen */
     if ( lua_istable(L, 2) ) {
-        // Be sure printer is not defined:
+        /* Be sure printer is not defined: */
         lua_pushliteral(L, "printer");
         lua_pushnil(L);
         lua_rawset(L, 2);
         lua_pushvalue(L, 2);
-        // convert_me, {extra}, ?, js_gen, {extra}
+        /* convert_me, {extra}, ?, js_gen, {extra} */
     } else {
         lua_newtable(L);
-        // convert_me, {extra}, ?, js_gen, {}
+        /* convert_me, {extra}, ?, js_gen, {} */
     }
     lua_call(L, 1, 1);
-    // convert_me, {extra}, ?, gen_ud
+    /* convert_me, {extra}, ?, gen_ud */
     lua_pushcfunction(L, js_generator_value);
-    // convert_me, {extra}, ?, gen_ud, js_gen_val
+    /* convert_me, {extra}, ?, gen_ud, js_gen_val */
     lua_pushvalue(L, -2);
-    // convert_me, {extra}, ?, gen_ud, js_gen_val, gen_ud
+    /* convert_me, {extra}, ?, gen_ud, js_gen_val, gen_ud */
     lua_pushvalue(L, 1);
-    // convert_me, {extra}, ?, gen_ud, js_gen_val, gen_ud, convert_me
+    /* convert_me, {extra}, ?, gen_ud, js_gen_val, gen_ud, convert_me */
     lua_call(L, 2, 0);
-    // convert_me, {extra}, ?, gen_ud
-    yajl_gen* gen = js_check_generator(L, -1);
-    const unsigned char *buf;
-    size_t len;
+    /* convert_me, {extra}, ?, gen_ud */
+    gen = js_check_generator(L, -1);
     yajl_gen_get_buf(*gen, &buf, &len);
-    // Copy into results:
+    /* Copy into results: */
     lua_pushlstring(L, (char*)buf, len);
     yajl_gen_clear(*gen);
     return 1;
@@ -124,10 +125,10 @@ static int got_map_value(lua_State* L) {
     lua_insert(L, -2);
     lua_pop(L, 1);
     lua_rawset(L, -3);
-    lua_pushnil(L); // Store future key here.
+    lua_pushnil(L); /* Store future key here. */
     lua_pushcfunction(L, got_map_key);
 
-    return 0; // Ignored.
+    return 0; /* Ignored. */
 }
 
 static int got_map_key(lua_State* L) {
@@ -135,7 +136,7 @@ static int got_map_key(lua_State* L) {
     lua_pop(L, 1);
     lua_pushcfunction(L, got_map_value);
 
-    return 0; // Ignored.
+    return 0; /* Ignored. */
 }
 
 static int got_array_value(lua_State* L) {
@@ -143,6 +144,8 @@ static int got_array_value(lua_State* L) {
     lua_rawseti(L, -4, lua_tointeger(L, -3));
     lua_pushinteger(L, lua_tointeger(L, -2)+1);
     lua_replace(L, -3);
+
+    return 0; /* Ignored. */
 }
 
 static int to_value_start_map(void* ctx) {
@@ -155,13 +158,13 @@ static int to_value_start_map(void* ctx) {
        - Value pushed on the stack by to_value_* functions.
     */
     if ( ! lua_checkstack(L, 4) ) {
-        // TODO: So far, YAJL seems to be fine with the longjmp, but
-        // perhaps we should do errors a different way?
+        /* TODO: So far, YAJL seems to be fine with the longjmp, but
+           perhaps we should do errors a different way? */
         return luaL_error(L, "lua stack overflow");
     }
 
     lua_newtable(L);
-    lua_pushnil(L); // Store future key here.
+    lua_pushnil(L); /* Store future key here. */
     lua_pushcfunction(L, got_map_key);
 
     return 1;
@@ -177,8 +180,8 @@ static int to_value_start_array(void* ctx) {
        - Value pushed on the stack by to_value_* functions.
     */
     if ( ! lua_checkstack(L, 4) ) {
-        // TODO: So far, YAJL seems to be fine with the longjmp, but
-        // perhaps we should do errors a different way?
+        /* TODO: So far, YAJL seems to be fine with the longjmp, but
+           perhaps we should do errors a different way? */
         return luaL_error(L, "lua stack overflow");
     }
 
@@ -192,7 +195,7 @@ static int to_value_start_array(void* ctx) {
 static int to_value_end(void* ctx) {
     lua_State* L = (lua_State*)ctx;
 
-    // Simply pop the stack and call the cfunction:
+    /* Simply pop the stack and call the cfunction: */
     lua_pop(L, 2);
     (lua_tocfunction(L, -2))(L);
 
@@ -217,7 +220,7 @@ static yajl_callbacks js_to_value_callbacks = {
     to_value_end,
 };
 
-//////////////////////////////////////////////////////////////////////
+
 static int js_to_value(lua_State *L) {
     yajl_handle          handle;
     size_t               len;
@@ -257,7 +260,6 @@ static int js_to_value(lua_State *L) {
     return 1;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_parser_null(void *ctx) {
     lua_State *L=(lua_State*)ctx;
     lua_getfield(L, lua_upvalueindex(2), "value");
@@ -273,7 +275,6 @@ static int js_parser_null(void *ctx) {
     return 1;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_parser_boolean(void *ctx, int val) {
     lua_State *L=(lua_State*)ctx;
 
@@ -290,7 +291,6 @@ static int js_parser_boolean(void *ctx, int val) {
     return 1;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_parser_number(void *ctx, const char* buffer, size_t buffer_len) {
     lua_State *L=(lua_State*)ctx;
 
@@ -307,7 +307,6 @@ static int js_parser_number(void *ctx, const char* buffer, size_t buffer_len) {
     return 1;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_parser_string(void *ctx, const unsigned char *val, size_t len) {
     lua_State *L=(lua_State*)ctx;
 
@@ -324,7 +323,6 @@ static int js_parser_string(void *ctx, const unsigned char *val, size_t len) {
     return 1;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_parser_start_map(void *ctx) {
     lua_State *L=(lua_State*)ctx;
 
@@ -339,11 +337,10 @@ static int js_parser_start_map(void *ctx) {
     return 1;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_parser_map_key(void *ctx, const unsigned char *val, size_t len) {
     lua_State *L=(lua_State*)ctx;
 
-    // TODO: Do we want to fall-back to calling "value"?
+    /* TODO: Do we want to fall-back to calling "value"? */
     lua_getfield(L, lua_upvalueindex(2), "object_key");
     if ( ! lua_isnil(L, -1) ) {
         lua_pushvalue(L, lua_upvalueindex(2));
@@ -356,7 +353,6 @@ static int js_parser_map_key(void *ctx, const unsigned char *val, size_t len) {
     return 1;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_parser_end_map(void *ctx) {
     lua_State *L=(lua_State*)ctx;
 
@@ -372,7 +368,6 @@ static int js_parser_end_map(void *ctx) {
     return 1;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_parser_start_array(void *ctx) {
     lua_State *L=(lua_State*)ctx;
 
@@ -387,7 +382,6 @@ static int js_parser_start_array(void *ctx) {
     return 1;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_parser_end_array(void *ctx) {
     lua_State *L=(lua_State*)ctx;
 
@@ -417,7 +411,6 @@ static yajl_callbacks js_parser_callbacks = {
     js_parser_end_array
 };
 
-//////////////////////////////////////////////////////////////////////
 static void js_parser_assert(lua_State* L,
                              yajl_status status,
                              yajl_handle* handle,
@@ -446,7 +439,6 @@ static void js_parser_assert(lua_State* L,
     lua_error(L);
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_parser_parse(lua_State *L) {
     yajl_handle* handle = (yajl_handle*)
         lua_touserdata(L, lua_upvalueindex(1));
@@ -477,19 +469,18 @@ static int js_parser_parse(lua_State *L) {
     return 0;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_parser_delete(lua_State *L) {
     luaL_checktype(L, 1, LUA_TUSERDATA);
     yajl_free(*(yajl_handle*)lua_touserdata(L, 1));
     return 0;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_parser(lua_State *L) {
+    yajl_handle* handle;
 
     luaL_checktype(L, 1, LUA_TTABLE);
 
-    yajl_handle* handle = (yajl_handle*)lua_newuserdata(L, sizeof(yajl_handle));
+    handle = (yajl_handle*)lua_newuserdata(L, sizeof(yajl_handle));
 
     *handle = yajl_alloc(&js_parser_callbacks, NULL, (void*)L);
     luaL_getmetatable(L, "yajl.parser.meta");
@@ -509,23 +500,21 @@ static int js_parser(lua_State *L) {
 
     lua_getfield(L, 1, "events");
 
-    // Create callback function that calls yajl_parse[_complete]()
-    //
-    // upvalue(1) = yajl_handle*
-    // upvalue(2) = events table
+    /* Create callback function that calls yajl_parse[_complete]()
+     
+      upvalue(1) = yajl_handle*
+      upvalue(2) = events table */
     lua_pushcclosure(L, &js_parser_parse, 2);
 
     return 1;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_generator_delete(lua_State *L) {
     yajl_gen* handle = js_check_generator(L, 1);
     yajl_gen_free(*handle);
     return 0;
 }
 
-//////////////////////////////////////////////////////////////////////
 static void js_generator_assert(lua_State *L,
                                 yajl_gen_status status,
                                 const char* file,
@@ -551,7 +540,6 @@ static void js_generator_assert(lua_State *L,
     lua_error(L);
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_generator_integer(lua_State *L) {
     js_generator_assert(L,
                         yajl_gen_integer(*js_check_generator(L, 1),
@@ -560,7 +548,6 @@ static int js_generator_integer(lua_State *L) {
     return 0;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_generator_double(lua_State *L) {
     js_generator_assert(L,
                         yajl_gen_double(*js_check_generator(L, 1),
@@ -569,22 +556,21 @@ static int js_generator_double(lua_State *L) {
     return 0;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_generator_number(lua_State *L) {
 
-    // It would be better to make it so an arbitrary string can be
-    // used here, however we would then need to validate that the
-    // generated string is a JSON number which is a bit beyond scope
-    // at this point.  Perhaps in the future we will loosen this
-    // restriction, it is always easier to loosen restrictions than it
-    // is to make new restrictions that break other people's code.
+    /* It would be better to make it so an arbitrary string can be
+       used here, however we would then need to validate that the
+       generated string is a JSON number which is a bit beyond scope
+       at this point.  Perhaps in the future we will loosen this
+       restriction, it is always easier to loosen restrictions than it
+       is to make new restrictions that break other people's code. */
     double num = luaL_checknumber(L, 2);
 
     size_t len;
     const char* str;
 
-    // These are special cases, not sure how better to represent them
-    // :-(.
+    /* These are special cases, not sure how better to represent them
+       :-(. */
     if ( num == HUGE_VAL ) {
         str = "1e+666";
         len = 6;
@@ -604,7 +590,6 @@ static int js_generator_number(lua_State *L) {
     return 0;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_generator_string(lua_State *L) {
     size_t len;
     const unsigned char* str = (const unsigned char*)luaL_checklstring(L, 2, &len);
@@ -615,7 +600,6 @@ static int js_generator_string(lua_State *L) {
     return 0;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_generator_null(lua_State *L) {
     js_generator_assert(L,
                         yajl_gen_null(*js_check_generator(L, 1)),
@@ -623,7 +607,6 @@ static int js_generator_null(lua_State *L) {
     return 0;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_generator_boolean(lua_State *L) {
     luaL_checktype(L, 2, LUA_TBOOLEAN);
     js_generator_assert(L,
@@ -636,12 +619,11 @@ static int js_generator_boolean(lua_State *L) {
 #define JS_OPEN_OBJECT 1
 #define JS_OPEN_ARRAY  2
 
-//////////////////////////////////////////////////////////////////////
 static int js_generator_open_object(lua_State *L) {
     js_generator_assert(L,
                         yajl_gen_map_open(*js_check_generator(L, 1)),
                         __FILE__, __LINE__);
-    // Why doesn't yajl_gen keep track of this!?
+    /* Why doesn't yajl_gen keep track of this!? */
     lua_getfenv(L, 1);
     lua_getfield(L, -1, "stack");
     lua_pushinteger(L, JS_OPEN_OBJECT);
@@ -649,12 +631,11 @@ static int js_generator_open_object(lua_State *L) {
     return 0;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_generator_open_array(lua_State *L) {
     js_generator_assert(L,
                         yajl_gen_array_open(*js_check_generator(L, 1)),
                         __FILE__, __LINE__);
-    // Why doesn't yajl_gen keep track of this!?
+    /* Why doesn't yajl_gen keep track of this!? */
     lua_getfenv(L, 1);
     lua_getfield(L, -1, "stack");
     lua_pushinteger(L, JS_OPEN_ARRAY);
@@ -662,9 +643,10 @@ static int js_generator_open_array(lua_State *L) {
     return 0;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_generator_close(lua_State *L) {
-    // Why doesn't yajl_gen keep track of this!?
+    lua_Integer type;
+
+    /* Why doesn't yajl_gen keep track of this!? */
     lua_getfenv(L, 1);
     lua_getfield(L, -1, "stack");
     lua_rawgeti(L, -1, lua_objlen(L, -1));
@@ -672,7 +654,7 @@ static int js_generator_close(lua_State *L) {
         lua_pushfstring(L, "StackUnderflow: Attempt to call close() when no array or object has been opened at %s line %d", __FILE__, __LINE__);
         lua_error(L);
     }
-    lua_Integer type = lua_tointeger(L, -1);
+    type = lua_tointeger(L, -1);
     switch ( type ) {
     case JS_OPEN_OBJECT:
         js_generator_assert(L,
@@ -688,7 +670,7 @@ static int js_generator_close(lua_State *L) {
         lua_pushfstring(L, "Unreachable: internal 'stack' contained invalid integer (%d) at %s line %d", type, __FILE__, __LINE__);
         lua_error(L);
     }
-    // delete the top of the "stack":
+    /* delete the top of the "stack": */
     lua_pop(L, 1);
     lua_pushnil(L);
     lua_rawseti(L, -2, lua_objlen(L, -2));
@@ -696,8 +678,9 @@ static int js_generator_close(lua_State *L) {
     return 0;
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_generator_value(lua_State *L) {
+    int max;
+    int is_array;
     int type = lua_type(L, 2);
 
     switch ( type ) {
@@ -719,22 +702,22 @@ static int js_generator_value(lua_State *L) {
     case LUA_TTHREAD:
         if ( luaL_getmetafield(L, 2, "__gen_json") ) {
             if  ( lua_isfunction(L, -1) ) {
-                lua_settop(L, 3); // gen, obj, func
-                lua_insert(L, 1); // func, gen, obj
-                lua_insert(L, 2); // func, obj, gen
+                lua_settop(L, 3); /* gen, obj, func */
+                lua_insert(L, 1); /* func, gen, obj */
+                lua_insert(L, 2); /* func, obj, gen */
                 lua_call(L, 2, 0);
                 return 0;
             }
             lua_pop(L, 1);
         }
 
-        // Simply ignore it, perhaps we should warn?
+        /* Simply ignore it, perhaps we should warn? */
         if ( type != LUA_TTABLE ) return 0;
 
-        int max      = 0;
-        int is_array = 1;
+        max      = 0;
+        is_array = 1;
 
-        // First iterate over the table to see if it is an array:
+        /* First iterate over the table to see if it is an array: */
         lua_pushnil(L);
         while ( lua_next(L, 2) != 0 ) {
             if ( lua_type(L, -2) == LUA_TNUMBER ) {
@@ -761,8 +744,8 @@ static int js_generator_value(lua_State *L) {
                 lua_pushinteger(L, i);
                 lua_gettable(L, 2);
 
-                // RECURSIVE CALL:
-                // gen, obj, ?, val, func, gen, val
+                /* RECURSIVE CALL:
+                   gen, obj, ?, val, func, gen, val */
                 lua_pushcfunction(L, js_generator_value);
                 lua_pushvalue(L, 1);
                 lua_pushvalue(L, -3);
@@ -775,16 +758,13 @@ static int js_generator_value(lua_State *L) {
 
             lua_pushnil(L);
             while ( lua_next(L, 2) != 0 ) {
-                size_t      len;
-                const char* str;
-
-                // gen, obj, ?, key, val, func, gen, key
+                /* gen, obj, ?, key, val, func, gen, key */
                 lua_pushcfunction(L, js_generator_string);
                 lua_pushvalue(L, 1);
                 if ( lua_isstring(L, -4) ) {
                     lua_pushvalue(L, -4);
                 } else {
-                    // Must coerce into a string:
+                    /* Must coerce into a string: */
                     lua_getglobal(L, "tostring");
                     lua_pushvalue(L, -5);
                     lua_call(L, 1, 1);
@@ -792,8 +772,8 @@ static int js_generator_value(lua_State *L) {
                 lua_call(L, 2, 0);
 
 
-                // RECURSIVE CALL:
-                // gen, obj, ?, key, val, func, gen, val
+                /* RECURSIVE CALL:
+                   gen, obj, ?, key, val, func, gen, val */
                 lua_pushcfunction(L, js_generator_value);
                 lua_pushvalue(L, 1);
                 lua_pushvalue(L, -3);
@@ -809,7 +789,7 @@ static int js_generator_value(lua_State *L) {
     default:
         lua_pushfstring(L, "Unreachable: js_generator_value passed lua type (%d) not recognized at %s line %d", type, __FILE__, __LINE__);
     }
-    // Shouldn't get here:
+    /* Shouldn't get here: */
     lua_error(L);
     return 0;
 }
@@ -819,18 +799,17 @@ typedef struct {
     int        printer_ref;
 } js_printer_ctx;
 
-//////////////////////////////////////////////////////////////////////
 static void js_printer(void* void_ctx, const char* str, size_t len) {
     js_printer_ctx* ctx = (js_printer_ctx*)void_ctx;
     lua_State* L = ctx->L;
 
-    // refs
+    /* refs */
     lua_getfield(L, LUA_REGISTRYINDEX, "yajl.refs");
-    // refs, printer
+    /* refs, printer */
     lua_rawgeti(L, -1, ctx->printer_ref);
     if ( lua_isfunction(L, -1) ) {
         lua_pushlstring(L, str, len);
-        // Not sure if yajl can handle longjmp's if this errors...
+        /* Not sure if yajl can handle longjmp's if this errors... */
         lua_call(L, 1, 0);
         lua_pop(L, 1);
     } else {
@@ -838,60 +817,62 @@ static void js_printer(void* void_ctx, const char* str, size_t len) {
     }
 }
 
-//////////////////////////////////////////////////////////////////////
 static int js_generator(lua_State *L) {
     yajl_print_t   print = NULL;
-    void *          ctx  = NULL;
+    void *         ctx   = NULL;
+    yajl_gen*      handle;
 
     luaL_checktype(L, 1, LUA_TTABLE);
 
-    // {args}, ?, tbl
+    /* {args}, ?, tbl */
     lua_newtable(L);
 
-    // Validate and save in fenv so it isn't gc'ed:
+    /* Validate and save in fenv so it isn't gc'ed: */
     lua_getfield(L, 1, "printer");
     if ( ! lua_isnil(L, -1) ) {
+        js_printer_ctx* print_ctx;
+
         luaL_checktype(L, -1, LUA_TFUNCTION);
 
         lua_pushvalue(L, -1);
 
-        // {args}, ?, tbl, printer, printer
+        /* {args}, ?, tbl, printer, printer */
         lua_setfield(L, -3, "printer");
 
-        js_printer_ctx* print_ctx = (js_printer_ctx*)
+        print_ctx = (js_printer_ctx*)
             lua_newuserdata(L, sizeof(js_printer_ctx));
-        // {args}, ?, tbl, printer, printer_ctx
+        /* {args}, ?, tbl, printer, printer_ctx */
 
         lua_setfield(L, -3, "printer_ctx");
-        // {args}, ?, tbl, printer
+        /* {args}, ?, tbl, printer */
 
         lua_getfield(L, LUA_REGISTRYINDEX, "yajl.refs");
-        // {args}, ?, tbl, printer, refs
+        /* {args}, ?, tbl, printer, refs */
         lua_insert(L, -2);
-        // {args}, ?, tbl, refs, printer
+        /* {args}, ?, tbl, refs, printer */
         print_ctx->printer_ref = luaL_ref(L, -2);
         print_ctx->L = L;
         print = &js_printer;
         ctx   = print_ctx;
     }
     lua_pop(L, 1);
-    // {args}, ?, tbl
+    /* {args}, ?, tbl */
 
-    // Sucks that yajl's generator doesn't keep track of this for me
-    // (this is a stack of strings "array" and "object" so I can keep
-    // track of what to "close"):
+    /* Sucks that yajl's generator doesn't keep track of this for me
+       (this is a stack of strings "array" and "object" so I can keep
+       track of what to "close"): */
     lua_newtable(L);
     lua_setfield(L, -2, "stack");
 
-    // {args}, ?, tbl
-    yajl_gen* handle = (yajl_gen*)lua_newuserdata(L, sizeof(yajl_gen));
+    /* {args}, ?, tbl */
+    handle = (yajl_gen*)lua_newuserdata(L, sizeof(yajl_gen));
     *handle = yajl_gen_alloc(NULL);
 
     if ( print ) {
         yajl_gen_config(*handle, yajl_gen_print_callback, print, ctx);
     }
 
-    // Get the indent and save so it isn't gc'ed:
+    /* Get the indent and save so it isn't gc'ed: */
     lua_getfield(L, 1, "indent");
     if ( ! lua_isnil(L, -1) ) {
         yajl_gen_config(*handle, yajl_gen_beautify, 1);
@@ -900,33 +881,31 @@ static int js_generator(lua_State *L) {
     } else {
         lua_pop(L, 1);
     }
-    // {args}, ?, tbl
+    /* {args}, ?, tbl */
 
-    // {args}, ?, tbl, ud, meta
+    /* {args}, ?, tbl, ud, meta */
     luaL_getmetatable(L, "yajl.generator.meta");
     lua_setmetatable(L, -2);
-    // {args}, ?, tbl, ud
+    /* {args}, ?, tbl, ud */
 
     lua_insert(L, -2);
-    // {args}, ?, ud, tbl
+    /* {args}, ?, ud, tbl */
     lua_setfenv(L, -2);
 
     return 1;
 }
 
-//////////////////////////////////////////////////////////////////////
 static void js_create_parser_mt(lua_State *L) {
-    luaL_newmetatable(L, "yajl.parser.meta"); // {}
+    luaL_newmetatable(L, "yajl.parser.meta");
 
     lua_pushcfunction(L, js_parser_delete);
     lua_setfield(L, -2, "__gc");
 
-    lua_pop(L, 1); // <empty>
+    lua_pop(L, 1);
 }
 
-//////////////////////////////////////////////////////////////////////
 static void js_create_generator_mt(lua_State *L) {
-    luaL_newmetatable(L, "yajl.generator.meta"); // {}
+    luaL_newmetatable(L, "yajl.generator.meta");
 
     lua_pushvalue(L, -1);
     lua_setfield(L, -2, "__index");
@@ -964,7 +943,7 @@ static void js_create_generator_mt(lua_State *L) {
     lua_pushcfunction(L, js_generator_close);
     lua_setfield(L, -2, "close");
 
-    lua_pop(L, 1); // <empty>
+    lua_pop(L, 1);
 }
 
 static int js_null_tostring(lua_State* L) {
@@ -972,28 +951,26 @@ static int js_null_tostring(lua_State* L) {
     return 1;
 }
 
-//////////////////////////////////////////////////////////////////////
 static void js_create_null_mt(lua_State *L) {
-    luaL_newmetatable(L, "yajl.null.meta"); // {}
+    luaL_newmetatable(L, "yajl.null.meta");
 
     lua_pushcfunction(L, js_null_tostring);
     lua_setfield(L, -2, "__tostring");
 
-    lua_pop(L, 1); // <empty>
+    lua_pop(L, 1);
 }
 
-//////////////////////////////////////////////////////////////////////
 LUALIB_API int luaopen_yajl(lua_State *L) {
     js_create_parser_mt(L);
     js_create_generator_mt(L);
     js_create_null_mt(L);
 
-    // Create the yajl.refs weak table:
+    /* Create the yajl.refs weak table: */
     lua_createtable(L, 0, 2);
-    lua_pushliteral(L, "v"); // tbl, "v"
+    lua_pushliteral(L, "v"); /* tbl, "v" */
     lua_setfield(L, -2, "__mode");
-    lua_pushvalue(L, -1);    // tbl, tbl
-    lua_setmetatable(L, -2); // tbl
+    lua_pushvalue(L, -1);    /* tbl, tbl */
+    lua_setmetatable(L, -2); /* tbl */
     lua_setfield(L, LUA_REGISTRYINDEX, "yajl.refs");
 
     lua_createtable(L, 0, 4);
