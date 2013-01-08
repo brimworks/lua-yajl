@@ -19,7 +19,6 @@ static void js_parser_assert(lua_State* L,
                              yajl_handle* handle,
                              const unsigned char* json_text,
                              size_t json_text_len,
-                             int expect_complete,
                              const char* file,
                              int line);
 static int got_map_key(lua_State* L);
@@ -107,7 +106,6 @@ static int to_value_boolean(void* ctx, int val) {
 /* See STRATEGY section below */
 static int to_value_number(void* ctx, const char* val, size_t len) {
     lua_State* L = (lua_State*)ctx;
-
     lua_pushnumber(L, todouble(L, val, len));
     (lua_tocfunction(L, -2))(L);
 
@@ -283,7 +281,6 @@ static int js_to_value(lua_State *L) {
     yajl_handle          handle;
     size_t               len;
     const unsigned char* buff = (const unsigned char*) luaL_checklstring(L, 1, &len);
-    int                  expect_complete = 1;
 
     if ( NULL == buff ) return 0;
 
@@ -309,7 +306,14 @@ static int js_to_value(lua_State *L) {
                      &handle,
                      buff,
                      len,
-                     expect_complete,
+                     __FILE__,
+                     __LINE__);
+
+    js_parser_assert(L,
+                     yajl_complete_parse(handle),
+                     &handle,
+                     buff,
+                     len,
                      __FILE__,
                      __LINE__);
 
@@ -474,7 +478,6 @@ static void js_parser_assert(lua_State* L,
                              yajl_handle* handle,
                              const unsigned char* json_text,
                              size_t json_text_len,
-                             int expect_complete,
                              const char* file,
                              int line)
 {
@@ -501,17 +504,14 @@ static int js_parser_parse(lua_State *L) {
     yajl_handle* handle = (yajl_handle*)
         lua_touserdata(L, lua_upvalueindex(1));
     if ( lua_isnil(L, 1) ) {
-        int expect_complete = 1;
         js_parser_assert(L,
                          yajl_complete_parse(*handle),
                          handle,
                          NULL,
                          0,
-                         expect_complete,
                          __FILE__,
                          __LINE__);
     } else {
-        int expect_complete = 0;
         size_t len;
         const unsigned char* buff = (const unsigned char*) luaL_checklstring(L, 1, &len);
         if ( NULL == buff ) return 0;
@@ -520,7 +520,6 @@ static int js_parser_parse(lua_State *L) {
                          handle,
                          buff,
                          len,
-                         expect_complete,
                          __FILE__,
                          __LINE__);
     }

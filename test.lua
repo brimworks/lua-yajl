@@ -9,13 +9,13 @@ local yajl  = require("yajl")
 local ok    = tap.ok
 
 function main()
-   test_simple()
-   null_at_end_of_array()
-   null_object_value()
-   weird_numbers()
-   number_in_string()
-   test_generator()
-   test_to_value()
+    test_simple()
+    null_at_end_of_array()
+    null_object_value()
+    weird_numbers()
+    number_in_string()
+    test_generator()
+    test_to_value()
 end
 
 function to_value(string)
@@ -107,6 +107,10 @@ function test_generator()
 end
 
 function test_simple()
+    -- Thanks to fab13n@github for this bug report:
+    -- https://github.com/brimworks/lua-yajl/issues/8
+    assert(yajl.to_value(yajl.to_string(0) == 0))
+
    local expect =
       '['..
       '"float",1.5,'..
