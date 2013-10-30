@@ -924,6 +924,7 @@ static int js_generator(lua_State *L) {
     /* {args}, ?, tbl */
     handle = (yajl_gen*)lua_newuserdata(L, sizeof(yajl_gen));
     *handle = yajl_gen_alloc(NULL);
+    /* {args}, ?, tbl, ud */
 
     if ( print ) {
         yajl_gen_config(*handle, yajl_gen_print_callback, print, ctx);
@@ -934,11 +935,11 @@ static int js_generator(lua_State *L) {
     if ( ! lua_isnil(L, -1) ) {
         yajl_gen_config(*handle, yajl_gen_beautify, 1);
         yajl_gen_config(*handle, yajl_gen_indent_string, lua_tostring(L, -1));
-        lua_setfield(L, -2, "indent");
+        lua_setfield(L, -3, "indent");
     } else {
         lua_pop(L, 1);
     }
-    /* {args}, ?, tbl */
+    /* {args}, ?, tbl, ud */
 
     /* {args}, ?, tbl, ud, meta */
     luaL_getmetatable(L, "yajl.generator.meta");
