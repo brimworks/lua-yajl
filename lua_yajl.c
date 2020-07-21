@@ -753,6 +753,7 @@ static int js_generator_value(lua_State *L) {
         if ( lua_topointer(L, 2) == js_null ) { 
             return js_generator_null(L);
         }
+        // FALL THRU
     case LUA_TLIGHTUSERDATA:
     case LUA_TTABLE:
     case LUA_TFUNCTION:
@@ -843,6 +844,7 @@ static int js_generator_value(lua_State *L) {
         return 0;
     case LUA_TNONE:
         lua_pushfstring(L, "MissingArgument: second parameter to js_generator_value() must be defined at %s line %d", type, __FILE__, __LINE__);
+        break;
     default:
         lua_pushfstring(L, "Unreachable: js_generator_value passed lua type (%d) not recognized at %s line %d", type, __FILE__, __LINE__);
     }
