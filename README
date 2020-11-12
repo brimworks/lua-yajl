@@ -99,7 +99,7 @@ lua_obj = yajl.to_value(string)
                 local arr = {}
                 stack[#stack](arr)
                 table.insert(stack, function(val)
-                    table.insert(result, val)
+                    table.insert(arr, val)
                 end)
             end,
             open_object: function()
