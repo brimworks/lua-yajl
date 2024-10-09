@@ -12,6 +12,12 @@
 
 static void* js_null;
 
+#if defined(LUA_VERSION_NUM) && LUA_VERSION_NUM >= 502
+#define lua_objlen(x, y) lua_rawlen(x, y)
+#define lua_setfenv(x, y) lua_setuservalue(x, y)
+#define lua_getfenv(x, y) lua_getuservalue(x, y)
+#endif
+
 static int js_generator(lua_State *L);
 static int js_generator_value(lua_State *L);
 static void js_parser_assert(lua_State* L,
@@ -886,7 +892,7 @@ static int js_generator(lua_State *L) {
     /* {args}, ?, tbl */
     lua_newtable(L);
 
-    /* Validate and save in fenv so it isn't gc'ed: */
+    /* Validate and save in registry so it isn't gc'ed: */
     lua_getfield(L, 1, "printer");
     if ( ! lua_isnil(L, -1) ) {
         js_printer_ctx* print_ctx;
