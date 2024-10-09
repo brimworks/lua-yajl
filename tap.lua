@@ -1,4 +1,3 @@
--- module(..., package.seeall)
 local tap = {}
 local counter = 1
 
