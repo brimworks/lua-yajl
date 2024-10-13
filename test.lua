@@ -1,9 +1,5 @@
 print "1..5"
 
-local src_dir, build_dir = ...
-package.path  = src_dir .. "?.lua;" .. package.path
-package.cpath = build_dir .. "?.so;" .. package.cpath
-
 local tap   = require("tap")
 local yajl  = require("yajl")
 local ok    = tap.ok
@@ -90,7 +86,7 @@ function test_generator()
                       "obool_key", { [true] = true },
                       "onull_key", { [yajl.null] = yajl.null },
                    })
-   generator:integer(10.3)
+   generator:integer(10)
    generator:double(10.3)
    generator:number(10.3)
    generator:string("a string")
@@ -109,7 +105,7 @@ end
 function test_simple()
     -- Thanks to fab13n@github for this bug report:
     -- https://github.com/brimworks/lua-yajl/issues/8
-    assert(yajl.to_value(yajl.to_string(0) == 0))
+    assert(yajl.to_value(yajl.to_string(0)) == 0)
 
    local expect =
       '['..

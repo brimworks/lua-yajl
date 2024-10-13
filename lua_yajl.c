@@ -1,3 +1,24 @@
+/**
+ * Copyright (c) 2009-2024 Brian Maher
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
 #include <yajl/yajl_parse.h>
 #include <yajl/yajl_gen.h>
 #include <lua.h>
@@ -11,6 +32,12 @@
     (yajl_gen*)luaL_checkudata((L), (narg), "yajl.generator.meta")
 
 static void* js_null;
+
+#if defined(LUA_VERSION_NUM) && LUA_VERSION_NUM >= 502
+#define lua_objlen(x, y) lua_rawlen(x, y)
+#define lua_setfenv(x, y) lua_setuservalue(x, y)
+#define lua_getfenv(x, y) lua_getuservalue(x, y)
+#endif
 
 static int js_generator(lua_State *L);
 static int js_generator_value(lua_State *L);
@@ -886,7 +913,7 @@ static int js_generator(lua_State *L) {
     /* {args}, ?, tbl */
     lua_newtable(L);
 
-    /* Validate and save in fenv so it isn't gc'ed: */
+    /* Validate and save in registry so it isn't gc'ed: */
     lua_getfield(L, 1, "printer");
     if ( ! lua_isnil(L, -1) ) {
         js_printer_ctx* print_ctx;

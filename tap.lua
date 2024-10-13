@@ -1,8 +1,7 @@
-module(..., package.seeall)
-
+local tap = {}
 local counter = 1
 
-function ok(assert_true, desc)
+function tap.ok(assert_true, desc)
    local msg = ( assert_true and "ok " or "not ok " ) .. counter
    if ( desc ) then
       msg = msg .. " - " .. desc
@@ -10,3 +9,5 @@ function ok(assert_true, desc)
    print(msg)
    counter = counter + 1
 end
+
+return tap
