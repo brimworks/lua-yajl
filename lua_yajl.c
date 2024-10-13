@@ -305,46 +305,52 @@ static yajl_callbacks js_to_value_callbacks = {
  * stack.
  */
 static int js_to_value(lua_State *L) {
-    yajl_handle          handle;
+    yajl_handle*         handle;
     size_t               len;
     const unsigned char* buff = (const unsigned char*) luaL_checklstring(L, 1, &len);
 
     if ( NULL == buff ) return 0;
 
-    handle = yajl_alloc(&js_to_value_callbacks, NULL, (void*)L);
+    // Ideally we would stack allocate the yajl_handle, however we need
+    // to ensure yajl_free is called on the handle in case lua_error()
+    // is called (which may happen if js_parser_assert() fails).
+    handle = (yajl_handle*)lua_newuserdata(L, sizeof(yajl_handle));
+
+    *handle = yajl_alloc(&js_to_value_callbacks, NULL, (void*)L);
+    luaL_getmetatable(L, "yajl.parser.meta");
+    lua_setmetatable(L, -2);
+
     lua_pushcfunction(L, noop);
 
     if ( lua_istable(L, 2) ) {
         lua_getfield(L, 2, "allow_comments");
         if ( ! lua_isnil(L, -1) ) {
-            yajl_config(handle, yajl_allow_comments, lua_toboolean(L, -1));
+            yajl_config(*handle, yajl_allow_comments, lua_toboolean(L, -1));
         }
         lua_pop(L, 1);
 
         lua_getfield(L, 2, "check_utf8");
         if ( ! lua_isnil(L, -1) ) {
-            yajl_config(handle, yajl_dont_validate_strings, !lua_toboolean(L, -1));
+            yajl_config(*handle, yajl_dont_validate_strings, !lua_toboolean(L, -1));
         }
         lua_pop(L, 1);
     }
 
     js_parser_assert(L,
-                     yajl_parse(handle, buff, len),
-                     &handle,
+                     yajl_parse(*handle, buff, len),
+                     handle,
                      buff,
                      len,
                      __FILE__,
                      __LINE__);
 
     js_parser_assert(L,
-                     yajl_complete_parse(handle),
-                     &handle,
+                     yajl_complete_parse(*handle),
+                     handle,
                      buff,
                      len,
                      __FILE__,
                      __LINE__);
-
-    yajl_free(handle);
 
     return 1;
 }
