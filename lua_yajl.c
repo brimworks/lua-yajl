@@ -797,7 +797,13 @@ static int js_generator_value(lua_State *L) {
         }
 
         /* Simply ignore it, perhaps we should warn? */
-        if ( type != LUA_TTABLE ) return 0;
+        if ( type != LUA_TTABLE ) {
+            /* Must coerce into a string: */
+            lua_getglobal(L, "tostring");
+            lua_insert(L, 2);
+            lua_call(L, 1, 1);
+            return js_generator_string(L);
+        }
 
         max      = 0;
         is_array = 1;
