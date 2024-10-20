@@ -6,6 +6,7 @@ local ok    = tap.ok
 
 function main()
     test_simple()
+    test_issue_13()
     null_at_end_of_array()
     null_object_value()
     weird_numbers()
@@ -50,6 +51,38 @@ function to_value(string)
 
    yajl.parser({ events = events })(string)
    return result
+end
+
+function test_issue_13()
+   local custom = { __gen_json = function(self, gen)
+         gen:string("custom json serializer")
+      end
+   }
+   setmetatable(custom, custom)
+   local val = {
+      func = function() end,
+      float = 1.5,
+      integer = 5,
+      string = "hello",
+      empty = {}, -- defaults to an empty array.
+      ["false"] = false,
+      custom = custom,
+      ostr_key = { key = "value" },
+      obool_key = { [true] = true },
+      onull_key = { [yajl.null] = yajl.null },
+   }
+   -- Round trip it:
+   local got = yajl.to_value(yajl.to_string(val))
+   ok(string.find(got.func, "^function: "), "expect 'function: .*', got '" .. tostring(got.func) .. "'")
+   ok(got.float == 1.5, "expect 1.5, got " .. tostring(got.float))
+   ok(got.integer == 5, "expect 5, got " .. tostring(got.integer))
+   ok(got.string == "hello", "expect 'hello', got '" .. tostring(got.string) .. "'")
+   ok(type(got.empty) == "table" and #got.empty == 0, "expect empty table, got " .. type(got.empty) .. " len=" .. #got.empty)
+   ok(got["false"] == false, "expected false, got " .. tostring(got["false"]))
+   ok(got.custom == "custom json serializer", "expected custom json serializer to run, got " .. tostring(got.custom))
+   ok(type(got.ostr_key) == "table" and got.ostr_key.key == "value", "got " .. tostring(got.ostr_key))
+   ok(type(got.obool_key) == "table" and got.obool_key["true"] == true, "got " .. tostring(got.obool_key))
+   ok(type(got.onull_key) == "table" and got.onull_key["null"] == yajl.null, "got " .. tostring(got.onull_key))
 end
 
 function test_to_value()
